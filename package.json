@@ -1,0 +1,24 @@
+{
+	"private": true,
+	"name": "shortcuts",
+	"version": "1.0.0",
+	"type": "module",
+	"author": "eccs0103",
+	"packageManager": "npm@11.6.2",
+	"engines": {
+		"node": ">=22"
+	},
+	"scripts": {
+		"dev": "wrangler dev",
+		"deploy": "wrangler deploy",
+		"typecheck": "tsc -p tsconfig.json"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^5.20260716.1",
+		"typescript": "^6.0.3",
+		"wrangler": "^4.111.0"
+	},
+	"dependencies": {
+		"adaptive-extender": "^1.0.5"
+	}
+}

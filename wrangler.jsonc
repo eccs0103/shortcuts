@@ -1,0 +1,12 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "shortcuts",
+	"main": "controllers/redirect-worker.ts",
+	"compatibility_date": "2026-07-16",
+	"observability": {
+		"enabled": true,
+		"traces": {
+			"enabled": true
+		}
+	}
+}
