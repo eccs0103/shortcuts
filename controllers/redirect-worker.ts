@@ -3,7 +3,6 @@
 import "adaptive-extender/core";
 import { CloudflareWorker } from "../environment/cloudflare-worker.js";
 import { RedirectService } from "../services/redirect-service.js";
-import { ShortcutRegistry } from "../models/shortcut-registry.js";
 
 //#region Redirect worker
 class RedirectWorker extends CloudflareWorker {
