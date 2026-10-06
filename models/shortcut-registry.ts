@@ -6,6 +6,7 @@ import "adaptive-extender/core";
 export class ShortcutRegistry {
 	static #ROUTES: ReadonlyMap<string, string> = new Map([
 		["vscode-quartz", "https://marketplace.visualstudio.com/items?itemName=eccs0103.quartz-language"],
+		["2026-11-03", "https://cheatsheet.eccs.dev/?import=https://gist.githubusercontent.com/eccs0103/578ff92d4de60eaedc36eee29a22be2c/raw"],
 	]);
 	#fallback: Readonly<URL> = new URL("https://eccs.dev");
 
