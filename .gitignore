@@ -9,7 +9,11 @@ lerna-debug.log*
 # Node modules / Build output
 node_modules
 dist
+dist-ssr
 *.local
+
+# Environment files
+.env
 
 # Editors / IDE
 .vscode/*
@@ -25,7 +29,10 @@ dist
 # My personal / temporary files
 .*
 !.gitignore
+!.gitattributes
+!.editorconfig
 !.npmignore
+!.github
 !.node-version
 !.npmrc
 

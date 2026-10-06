@@ -1,11 +1,12 @@
 "use strict";
 
 import "adaptive-extender/core";
-import { CloudflareWorker } from "../environment/cloudflare-worker.js";
+import { type Environment } from "adaptive-extender/core";
+import { CloudflareWorker } from "../environment/workers/cloudflare-worker.js";
 import { RedirectService } from "../services/redirect-service.js";
 
 //#region Redirect worker
-class RedirectWorker extends CloudflareWorker {
+class RedirectWorker extends CloudflareWorker<Environment> {
 	#service: RedirectService = new RedirectService();
 
 	async run(request: Request): Promise<Response> {
