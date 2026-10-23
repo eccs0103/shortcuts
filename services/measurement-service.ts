@@ -3,85 +3,77 @@
 import "adaptive-extender/core";
 import { Nullable } from "adaptive-extender/core";
 import { VisitorCookies } from "../environment/workers/visitor-cookies.js";
+import { MeasurementDevice, MeasurementEvent, MeasurementLocation, MeasurementPayload } from "../models/measurement-payload.js";
 import { ShortcutOpen } from "../models/shortcut-open.js";
 
 //#region Measurement service
-/** Sends a shortcut open to GA4 from the server through the Measurement Protocol, so a redirect that has no page is still recorded in the same property as the sites, under the same visitor. Ad blockers cannot stop it, because nothing runs in the browser. */
 export class MeasurementService {
 	static #endpoint: string = "https://www.google-analytics.com/mp/collect";
 	static #measurement: string = "G-1N3MKL65T7";
-	static #clientCookie: string = "_ga";
-	static #sessionCookie: string = "_ga_1N3MKL65T7";
-	static #clientPattern: RegExp = /^GA\d\.\d+\.(\d+\.\d+)$/;
-	static #sessionPattern: RegExp = /^GS\d\.\d+\.s?(\d+)/;
+	static #event: string = "shortcut_open";
+	static #cookieClient: string = "_ga";
+	static #cookieSession: string = "_ga_1N3MKL65T7";
+	static #patternClient: RegExp = /^GA\d\.\d+\.(\d+\.\d+)$/;
+	static #patternSession: RegExp = /^GS\d\.\d+\.s?(\d+)/;
 
-	#secret: string;
+	#url: URL;
 
 	constructor(secret: string) {
-		this.#secret = secret;
+		const url = new URL(MeasurementService.#endpoint);
+		url.searchParams.set("measurement_id", MeasurementService.#measurement);
+		url.searchParams.set("api_secret", secret);
+		this.#url = url;
 	}
 
-	/** GA's own device id from the _ga cookie the sites set on eccs.dev, so the event joins that browser's visits. A browser without one gets a throwaway id in GA's format; it is never written back as a cookie. */
 	static #client(request: Request): string {
-		const cookie = VisitorCookies.read(request, MeasurementService.#clientCookie);
-		const pattern = MeasurementService.#clientPattern;
+		const cookie = VisitorCookies.read(request, MeasurementService.#cookieClient);
+		const pattern = MeasurementService.#patternClient;
 		const match = Nullable.map(cookie, pattern.exec.bind(pattern));
 		if (match !== null) return match[1];
 		const [random] = crypto.getRandomValues(new Uint32Array(1));
 		return `${random}.${Date.AsUnixSeconds.export(new Date())}`;
 	}
 
-	/** The GA session the browser is in, from the _ga_<stream> cookie, so the open lands in the same session as the page that follows. Without one, a new session starts now, the way GA numbers sessions. */
 	static #session(request: Request): number {
-		const cookie = VisitorCookies.read(request, MeasurementService.#sessionCookie);
-		const pattern = MeasurementService.#sessionPattern;
+		const cookie = VisitorCookies.read(request, MeasurementService.#cookieSession);
+		const pattern = MeasurementService.#patternSession;
 		const match = Nullable.map(cookie, pattern.exec.bind(pattern));
 		if (match !== null) return Number(match[1]);
 		return Date.AsUnixSeconds.export(new Date());
 	}
 
-	/** Where the visitor is, from Cloudflare's geolocation of the request, because GA cannot locate a server-side event by itself. */
-	static #location(request: Request): object {
+	static #text(value: unknown): string | null {
+		if (typeof value !== "string") return null;
+		return value;
+	}
+
+	static #location(request: Request): MeasurementLocation {
 		const { cf } = request;
-		if (cf === undefined) return {};
+		if (cf === undefined) return new MeasurementLocation(null, null, null);
 		const { city, country, regionCode } = cf;
-		const region = country === undefined || regionCode === undefined ? undefined : `${country}-${regionCode}`;
-		return { city, country_id: country, region_id: region };
+		return new MeasurementLocation(MeasurementService.#text(city), MeasurementService.#text(country), MeasurementService.#text(regionCode));
 	}
 
-	/** The browser's first preferred language (e.g. "ru" from "ru-RU,ru;q=0.9,en;q=0.8"). */
-	static #device(request: Request): object {
-		const header = request.headers.get("Accept-Language");
-		if (header === null) return {};
-		const [preferred] = header.split(",");
-		const [language] = preferred.split(";");
-		return { language: language.trim() };
-	}
-
-	/** The open of one shortcut, from what the request carries; page_location drops the query string. */
-	static #event(request: Request, cookies: VisitorCookies, name: string, target: URL): ShortcutOpen {
+	static #open(request: Request, cookies: VisitorCookies, name: string, target: URL): ShortcutOpen {
 		const { url, headers } = request;
 		const { origin, pathname } = new URL(url);
-		return new ShortcutOpen(name, target.host, `${origin}${pathname}`, headers.get("Referer"), cookies.network, headers.get("User-Agent"));
+		return new ShortcutOpen(name, target.host, `${origin}${pathname}`, headers.get("Referer"), cookies.network, headers.get("User-Agent"), MeasurementService.#session(request));
 	}
 
-	/** Records the open in GA4. Skipped when the browser asks not to be tracked (Global Privacy Control). */
+	static #payload(request: Request, cookies: VisitorCookies, name: string, target: URL): MeasurementPayload {
+		const client = MeasurementService.#client(request);
+		const location = MeasurementService.#location(request);
+		const event = new MeasurementEvent(MeasurementService.#event, MeasurementService.#open(request, cookies, name, target));
+		const device = new MeasurementDevice(request.headers.get("Accept-Language"));
+		return new MeasurementPayload(client, cookies.user, location, device, [event]);
+	}
+
 	async send(request: Request, cookies: VisitorCookies, name: string, target: URL): Promise<void> {
 		if (request.headers.get("Sec-GPC") === "1") return;
-		const event = MeasurementService.#event(request, cookies, name, target);
-		const params = Object.assign(ShortcutOpen.export(event), { session_id: MeasurementService.#session(request), engagement_time_msec: 1 });
-		const body = {
-			client_id: MeasurementService.#client(request),
-			user_id: cookies.user,
-			user_location: MeasurementService.#location(request),
-			device: MeasurementService.#device(request),
-			events: [{ name: "shortcut_open", params }],
-		};
-		const url = new URL(MeasurementService.#endpoint);
-		url.searchParams.set("measurement_id", MeasurementService.#measurement);
-		url.searchParams.set("api_secret", this.#secret);
+		const object = MeasurementPayload.export(MeasurementService.#payload(request, cookies, name, target));
+		const body = JSON.stringify(object);
 		try {
-			await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+			await fetch(this.#url, { method: "POST", headers: { "Content-Type": "application/json" }, body });
 		} catch (reason) {
 			console.error(`Measurement failed:\n${Error.from(reason)}`);
 		}

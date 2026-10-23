@@ -21,13 +21,9 @@ export class VisitorCookies {
 		this.#scope = VisitorCookies.#attributes(request);
 	}
 
-	/** The visitor id this response hands out: the one the browser sent, or a fresh one. */
 	get user(): string { return this.#user; }
-
-	/** The organisation that owns the visitor's network, or null when Cloudflare did not name one. */
 	get network(): string | null { return this.#network; }
 
-	/** The value of one cookie the browser sent with the request, or null when it sent none by that name. */
 	static read(request: Request, name: string): string | null {
 		const header = request.headers.get("Cookie");
 		if (header === null) return null;
@@ -37,7 +33,6 @@ export class VisitorCookies {
 		return entry.slice(prefix.length);
 	}
 
-	/** Keeps a well-formed existing id and re-issues it server-side, so Safari's 7-day cap on script-written cookies never applies; anything else is replaced by a fresh random id. */
 	static #identify(request: Request): string {
 		const existing = VisitorCookies.read(request, VisitorCookies.#keyUser);
 		if (existing === null) return crypto.randomUUID();
