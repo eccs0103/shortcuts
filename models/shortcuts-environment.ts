@@ -9,7 +9,7 @@ export interface ShortcutsEnvironmentScheme {
 }
 
 export class ShortcutsEnvironment extends Model {
-	/** GA4 Measurement Protocol API secret. Null when it is not set: shortcut opens are then not sent. */
+	/** GA4 Measurement Protocol API secret. */
 	@Field(String, { name: "MEASUREMENT_SECRET" })
 	secret: string;
 }

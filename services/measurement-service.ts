@@ -24,7 +24,8 @@ export class MeasurementService {
 	/** GA's own device id from the _ga cookie the sites set on eccs.dev, so the event joins that browser's visits. A browser without one gets a throwaway id in GA's format; it is never written back as a cookie. */
 	static #client(request: Request): string {
 		const cookie = VisitorCookies.read(request, MeasurementService.#clientCookie);
-		const match = Nullable.map(cookie, MeasurementService.#clientPattern.exec);
+		const pattern = MeasurementService.#clientPattern;
+		const match = Nullable.map(cookie, pattern.exec.bind(pattern));
 		if (match !== null) return match[1];
 		const [random] = crypto.getRandomValues(new Uint32Array(1));
 		return `${random}.${Date.AsUnixSeconds.export(new Date())}`;
@@ -33,7 +34,8 @@ export class MeasurementService {
 	/** The GA session the browser is in, from the _ga_<stream> cookie, so the open lands in the same session as the page that follows. Without one, a new session starts now, the way GA numbers sessions. */
 	static #session(request: Request): number {
 		const cookie = VisitorCookies.read(request, MeasurementService.#sessionCookie);
-		const match = Nullable.map(cookie, MeasurementService.#sessionPattern.exec);
+		const pattern = MeasurementService.#sessionPattern;
+		const match = Nullable.map(cookie, pattern.exec.bind(pattern));
 		if (match !== null) return Number(match[1]);
 		return Date.AsUnixSeconds.export(new Date());
 	}
@@ -56,11 +58,21 @@ export class MeasurementService {
 		return { language: language.trim() };
 	}
 
-	async send(request: Request, user: string, event: ShortcutOpen): Promise<void> {
+	/** The open of one shortcut, from what the request carries; page_location drops the query string. */
+	static #event(request: Request, cookies: VisitorCookies, name: string, target: URL): ShortcutOpen {
+		const { url, headers } = request;
+		const { origin, pathname } = new URL(url);
+		return new ShortcutOpen(name, target.host, `${origin}${pathname}`, headers.get("Referer"), cookies.network, headers.get("User-Agent"));
+	}
+
+	/** Records the open in GA4. Skipped when the browser asks not to be tracked (Global Privacy Control). */
+	async send(request: Request, cookies: VisitorCookies, name: string, target: URL): Promise<void> {
+		if (request.headers.get("Sec-GPC") === "1") return;
+		const event = MeasurementService.#event(request, cookies, name, target);
 		const params = Object.assign(ShortcutOpen.export(event), { session_id: MeasurementService.#session(request), engagement_time_msec: 1 });
 		const body = {
 			client_id: MeasurementService.#client(request),
-			user_id: user,
+			user_id: cookies.user,
 			user_location: MeasurementService.#location(request),
 			device: MeasurementService.#device(request),
 			events: [{ name: "shortcut_open", params }],
