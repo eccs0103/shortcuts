@@ -20,5 +20,8 @@
 	},
 	"dependencies": {
 		"adaptive-extender": "^1.1.6"
+	},
+	"overrides": {
+		"undici": "^7.30.1"
 	}
 }
