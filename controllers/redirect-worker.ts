@@ -9,11 +9,16 @@ import { RedirectService } from "../services/redirect-service.js";
 import { ShortcutRegistry } from "../services/shortcut-registry.js";
 
 //#region Redirect worker
-class RedirectWorker extends CloudflareWorker<Environment> {
-	async run(request: Request, environment: Environment, context: ExecutionContext): Promise<Response> {
+interface ShortcutsServices {
+	ASSETS: Fetcher;
+}
+type ShortcutsBindings = Environment & ShortcutsServices;
+
+class RedirectWorker extends CloudflareWorker<ShortcutsBindings> {
+	async run(request: Request, environment: ShortcutsBindings, context: ExecutionContext): Promise<Response> {
 		const { secret } = EnvironmentProvider.resolve(environment, ShortcutsEnvironment);
 		const url = new URL(request.url);
-		const registry = new ShortcutRegistry(url);
+		const registry = new ShortcutRegistry(environment.ASSETS, url);
 		const measurement = new MeasurementService(secret);
 		const service = new RedirectService(registry, measurement);
 		return await service.handle(request, context);

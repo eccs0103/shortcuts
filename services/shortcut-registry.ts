@@ -6,14 +6,16 @@ import "adaptive-extender/core";
 export class ShortcutRegistry {
 	static #path: string = "/data/shortcuts.json";
 
+	#assets: Fetcher;
 	#source: URL;
 
-	constructor(origin: Readonly<URL>) {
+	constructor(assets: Fetcher, origin: Readonly<URL>) {
+		this.#assets = assets;
 		this.#source = new URL(ShortcutRegistry.#path, origin);
 	}
 
 	async #targets(): Promise<Map<string, string>> {
-		const response = await fetch(this.#source);
+		const response = await this.#assets.fetch(this.#source);
 		if (!response.ok) throw new ReferenceError(`Unable to read shortcuts due ${response.status} status`);
 		return Map.AsRecord(String).import(await response.json(), "shortcuts.json");
 	}
