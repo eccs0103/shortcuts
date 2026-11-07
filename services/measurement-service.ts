@@ -1,7 +1,7 @@
 "use strict";
 
 import "adaptive-extender/core";
-import { Nullable } from "adaptive-extender/core";
+import { Nullable, URI } from "adaptive-extender/core";
 import { VisitorCookies } from "../environment/workers/visitor-cookies.js";
 import { MeasurementDevice, MeasurementEvent, MeasurementLocation, MeasurementPayload } from "../models/measurement-payload.js";
 import { ShortcutOpen } from "../models/shortcut-open.js";
@@ -16,13 +16,13 @@ export class MeasurementService {
 	static #patternClient: RegExp = /^GA\d\.\d+\.(\d+\.\d+)$/;
 	static #patternSession: RegExp = /^GS\d\.\d+\.s?(\d+)/;
 
-	#url: URL;
+	#uri: URI;
 
 	constructor(secret: string) {
-		const url = new URL(MeasurementService.#endpoint);
-		url.searchParams.set("measurement_id", MeasurementService.#measurement);
-		url.searchParams.set("api_secret", secret);
-		this.#url = url;
+		const uri = new URI(MeasurementService.#endpoint);
+		uri.searchParams.set("measurement_id", MeasurementService.#measurement);
+		uri.searchParams.set("api_secret", secret);
+		this.#uri = uri;
 	}
 
 	static #client(request: Request): string {
@@ -54,13 +54,13 @@ export class MeasurementService {
 		return new MeasurementLocation(MeasurementService.#text(city), MeasurementService.#text(country), MeasurementService.#text(regionCode));
 	}
 
-	static #open(request: Request, cookies: VisitorCookies, name: string, target: URL): ShortcutOpen {
+	static #open(request: Request, cookies: VisitorCookies, name: string, target: URI): ShortcutOpen {
 		const { url, headers } = request;
-		const { origin, pathname } = new URL(url);
+		const { origin, pathname } = new URI(url);
 		return new ShortcutOpen(name, target.host, `${origin}${pathname}`, headers.get("Referer"), cookies.network, headers.get("User-Agent"), MeasurementService.#session(request));
 	}
 
-	static #payload(request: Request, cookies: VisitorCookies, name: string, target: URL): MeasurementPayload {
+	static #payload(request: Request, cookies: VisitorCookies, name: string, target: URI): MeasurementPayload {
 		const client = MeasurementService.#client(request);
 		const location = MeasurementService.#location(request);
 		const event = new MeasurementEvent(MeasurementService.#event, MeasurementService.#open(request, cookies, name, target));
@@ -68,12 +68,12 @@ export class MeasurementService {
 		return new MeasurementPayload(client, cookies.user, location, device, [event]);
 	}
 
-	async send(request: Request, cookies: VisitorCookies, name: string, target: URL): Promise<void> {
+	async send(request: Request, cookies: VisitorCookies, name: string, target: URI): Promise<void> {
 		if (request.headers.get("Sec-GPC") === "1") return;
 		const object = MeasurementPayload.export(MeasurementService.#payload(request, cookies, name, target));
 		const body = JSON.stringify(object);
 		try {
-			await fetch(this.#url, { method: "POST", headers: { "Content-Type": "application/json" }, body });
+			await fetch(this.#uri.href, { method: "POST", headers: { "Content-Type": "application/json" }, body });
 		} catch (reason) {
 			console.error(`Measurement failed:\n${Error.from(reason)}`);
 		}

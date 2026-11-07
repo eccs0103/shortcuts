@@ -1,6 +1,7 @@
 "use strict";
 
 import "adaptive-extender/core";
+import { URI } from "adaptive-extender/core";
 import { VisitorCookies } from "../environment/workers/visitor-cookies.js";
 import { type MeasurementService } from "./measurement-service.js";
 import { type ShortcutRegistry } from "./shortcut-registry.js";
@@ -17,9 +18,9 @@ export class RedirectService {
 		this.#measurement = measurement;
 	}
 
-	#redirect(target: URL, cookies: VisitorCookies): Response {
+	#redirect(target: URI, cookies: VisitorCookies): Response {
 		const headers = new Headers();
-		headers.set("Location", String(target));
+		headers.set("Location", target.href);
 		headers.set("Cache-Control", "no-store");
 		for (const line of cookies.issue()) headers.append("Set-Cookie", line);
 		return new Response(null, { status: 302, headers });
@@ -33,7 +34,7 @@ export class RedirectService {
 		const { method, url } = request;
 		if (method !== "GET" && method !== "HEAD") return new Response("Method Not Allowed", { status: 405 });
 
-		const { pathname } = new URL(url);
+		const { pathname } = new URI(url);
 		const cookies = new VisitorCookies(request);
 		if (pathname === "/") return this.#notFound();
 		const match = RedirectService.#pattern.exec(pathname);
